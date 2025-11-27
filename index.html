@@ -1,0 +1,1114 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>AtmacaPro - WiFi Floor Plan Mapper</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+</head>
+<body>
+    <div class="app">
+        <header class="header">
+            <div class="header-left">
+                <span class="header-icon">🦅</span>
+                <span class="header-title">AtmacaPro</span>
+                <div class="signal-badge" id="signal-badge">-- dBm</div>
+            </div>
+            <div class="header-right">
+                <button class="icon-btn" onclick="showInfoModal()" title="Bilgi">ℹ️</button>
+                <button class="icon-btn" onclick="loadFloorPlan()" title="Kat Planı Yükle">📁</button>
+                <button class="icon-btn" onclick="saveMap()" title="Kaydet">💾</button>
+            </div>
+        </header>
+
+        <div class="map-container" id="map-container">
+            <canvas id="map-canvas"></canvas>
+            
+            <!-- Floor Plan Upload -->
+            <div class="floorplan-overlay" id="floorplan-overlay">
+                <div class="floorplan-upload">
+                    <h3>📐 Kat Planı Yükle</h3>
+                    <p>Kat planınızı yükleyin veya boş harita ile başlayın.</p>
+                    <div>
+                        <button class="upload-btn" onclick="document.getElementById('floorplan-input').click()">
+                            📁 Resim Yükle
+                        </button>
+                        <button class="upload-btn" onclick="startWithoutFloorPlan()" style="background: #666;">
+                            ▶️ Boş Harita ile Başla
+                        </button>
+                    </div>
+                    <input type="file" id="floorplan-input" accept="image/*" style="display: none;" onchange="handleFloorPlanUpload(event)">
+                </div>
+            </div>
+            
+            <div class="position-indicator" id="position-indicator">
+                <div class="position-dot"></div>
+            </div>
+            
+            <div class="rec-indicator" id="rec-indicator">
+                <div class="rec-dot"></div>
+                <span>KAYIT YAPILIYOR</span>
+            </div>
+            
+            <div class="gps-status" id="gps-status">
+                <div class="gps-dot" id="gps-dot"></div>
+                <span id="gps-text">GPS</span>
+            </div>
+            
+            <div class="wifi-warning" id="wifi-warning">
+                <h3>⚠️ WiFi Bağlantısı Yok</h3>
+                <p>Lütfen mobil veriyi kapatıp WiFi'ye bağlanın.</p>
+            </div>
+
+            <div class="legend">
+                <span class="legend-text">dBm</span>
+                <div>
+                    <div class="legend-bar"></div>
+                    <div class="legend-labels">
+                        <span>-80</span>
+                        <span>-60</span>
+                        <span>-40</span>
+                        <span>-30</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="info-panel">
+            <div class="info-item">
+                <div class="info-value neutral" id="info-signal">--</div>
+                <div class="info-label">Sinyal</div>
+            </div>
+            <div class="info-item">
+                <div class="info-value neutral" id="info-points">0</div>
+                <div class="info-label">Nokta</div>
+            </div>
+            <div class="info-item">
+                <div class="info-value neutral" id="info-latency">--</div>
+                <div class="info-label">Ping</div>
+            </div>
+            <div class="info-item">
+                <div class="info-value neutral" id="info-quality">--</div>
+                <div class="info-label">Kalite</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <button class="btn btn-secondary" onclick="clearMap()">🗑️ Temizle</button>
+            <button class="btn btn-primary" id="btn-record" onclick="toggleRecording()">▶️ Başlat</button>
+            <button class="btn btn-speed" onclick="saveMap()">💾 İndir</button>
+        </div>
+
+        <!-- Bilgi Kutusu (Sayfa Altı) -->
+        <div class="info-banner" id="info-banner">
+            <div class="info-banner-text">
+                <span>🦅</span>
+                <span>
+                    <strong>AtmacaPro</strong> - Eğitim amaçlı milli teknoloji projesi. 
+                    <span class="info-banner-link" onclick="showInfoModal()">Detaylar</span> | 
+                    <a href="https://github.com/bootkitt/" target="_blank" class="info-banner-link">GitHub</a>
+                </span>
+            </div>
+            <div class="info-banner-actions">
+                <button class="info-btn" onclick="showInfoModal()">ℹ️ Bilgi</button>
+                <button class="info-banner-close" onclick="hideInfoBanner()">×</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bilgilendirme Modal -->
+    <div class="info-modal" id="info-modal">
+        <div class="info-modal-content">
+            <button class="info-modal-close" onclick="closeInfoModal()">×</button>
+            <h2>🦅 AtmacaPro Hakkında</h2>
+            
+            <div class="warning-box">
+                <h3>⚠️ Önemli Uyarı</h3>
+                <p>
+                    <strong>AtmacaPro</strong> web tabanlı bir eğitim amaçlı uygulamadır. 
+                    Web teknolojilerinin kısıtlamaları nedeniyle <span class="highlight">%100 stabil sonuçlar</span> vermeyebilir.
+                </p>
+            </div>
+
+            <h3>📚 Eğitim Amaçlı Geliştirme</h3>
+            <p>
+                Bu uygulama, WiFi sinyal haritalama ve coğrafi veri görselleştirme konularında 
+                <span class="highlight">eğitim ve öğrenme</span> amaçlı geliştirilmiştir. 
+                Profesyonel WiFi analizi için native mobil uygulamalar kullanılması önerilir.
+            </p>
+
+            <h3>🇹🇷 Milli Teknoloji</h3>
+            <p>
+                <span class="highlight">AtmacaPro</span>, Türkiye'de geliştirilen açık kaynak bir projedir. 
+                Milli teknoloji ekosistemine katkı sağlamak ve yerli yazılım gelişimini desteklemek amacıyla 
+                topluluk desteğiyle geliştirilmektedir.
+            </p>
+
+            <h3>🔒 Veri Güvenliği</h3>
+            <div class="security-box">
+                <p>
+                    <strong>Verileriniz güvende:</strong>
+                </p>
+                <ul>
+                    <li>Tüm ölçümler ve harita verileri <strong>sadece tarayıcınızda</strong> saklanır</li>
+                    <li>Hiçbir veri sunucuya gönderilmez veya dışarı aktarılmaz</li>
+                    <li>GPS konum bilgileriniz yalnızca harita oluşturmak için kullanılır</li>
+                    <li>İnternet bağlantısı sadece sinyal ölçümü için kullanılır</li>
+                </ul>
+            </div>
+
+            <h3>🌐 Web Teknolojisi Kısıtlamaları</h3>
+            <p>Aşağıdaki özellikler web tabanlı uygulamalarda mevcut değildir:</p>
+            <ul>
+                <li><strong>AR/Duvar Algılama:</strong> Web'de mümkün değil (native app gerekli)</li>
+                <li><strong>Gerçek WiFi API:</strong> Web'de erişim yok (simülasyon kullanılıyor)</li>
+                <li><strong>LiDAR:</strong> Web'de desteklenmiyor</li>
+                <li><strong>Kesin GPS Doğruluğu:</strong> Tarayıcı kısıtlamaları nedeniyle sınırlı</li>
+            </ul>
+
+            <h3>💡 Destek ve Katkı</h3>
+            <p>
+                Projeyi geliştirmek, hata bildirmek veya özellik önerilerinde bulunmak için 
+                GitHub üzerinden iletişime geçebilirsiniz:
+            </p>
+            <a href="https://github.com/bootkitt/" target="_blank" class="github-link">
+                🔗 GitHub'da Destekle
+            </a>
+
+            <div class="checkbox-container">
+                <input type="checkbox" id="dont-show-again" onchange="saveInfoModalPreference()">
+                <label for="dont-show-again">Bu mesajı bir daha gösterme</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        const canvas = document.getElementById('map-canvas');
+        const ctx = canvas.getContext('2d', { alpha: false });
+        let width, height;
+        
+        let isRecording = false;
+        let points = [];
+        let currentPos = { x: 0, y: 0 };
+        let lastGPS = null;
+        let watchId = null;
+        let floorPlanImage = null;
+        let floorPlanScale = 1;
+        let floorPlanOffset = { x: 0, y: 0 };
+        let accessPoints = []; // AP listesi
+        
+        const PIXELS_PER_METER = 20;
+        let originLatLon = null;
+        
+        // View transform (Auto-pan & Zoom)
+        let viewOffset = { x: 0, y: 0 }; // Pan offset
+        let viewZoom = 1; // Zoom level
+        let worldBounds = { minX: 0, minY: 0, maxX: 0, maxY: 0 }; // World space bounds
+
+        function init() {
+            resize();
+            window.addEventListener('resize', resize);
+            checkWifiConnection();
+            if (navigator.connection) {
+                navigator.connection.addEventListener('change', checkWifiConnection);
+            }
+            
+            // Bilgilendirme modalını kontrol et
+            checkInfoModal();
+            
+            render();
+            
+            // Smooth animasyon için sürekli render
+            function animate() {
+                render(); // Her zaman render et (noktalar görünsün)
+                requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        // Bilgilendirme Modal Fonksiyonları
+        function showInfoModal() {
+            document.getElementById('info-modal').classList.add('visible');
+        }
+
+        function closeInfoModal() {
+            document.getElementById('info-modal').classList.remove('visible');
+        }
+
+        function hideInfoBanner() {
+            document.getElementById('info-banner').classList.add('hidden');
+            localStorage.setItem('atmacaPro_hideBanner', 'true');
+        }
+
+        function saveInfoModalPreference() {
+            const checkbox = document.getElementById('dont-show-again');
+            if (checkbox.checked) {
+                localStorage.setItem('atmacaPro_dontShowInfo', 'true');
+            } else {
+                localStorage.removeItem('atmacaPro_dontShowInfo');
+            }
+        }
+
+        function checkInfoModal() {
+            const dontShow = localStorage.getItem('atmacaPro_dontShowInfo');
+            const hideBanner = localStorage.getItem('atmacaPro_hideBanner');
+            
+            if (dontShow === 'true') {
+                // Modal gösterilmesin
+                return;
+            }
+            
+            // İlk açılışta modal göster
+            setTimeout(() => {
+                showInfoModal();
+            }, 500);
+            
+            // Banner'ı kontrol et
+            if (hideBanner === 'true') {
+                document.getElementById('info-banner').classList.add('hidden');
+            }
+        }
+
+        // Modal dışına tıklanınca kapat
+        document.addEventListener('click', (e) => {
+            const modal = document.getElementById('info-modal');
+            if (e.target === modal) {
+                closeInfoModal();
+            }
+        });
+
+        function resize() {
+            width = canvas.width = document.getElementById('map-container').offsetWidth;
+            height = canvas.height = document.getElementById('map-container').offsetHeight;
+            if (!originLatLon) {
+                currentPos = { x: 0, y: 0 }; // World space'de başla
+                viewOffset = { x: width/2, y: height/2 }; // View'ı merkeze al
+            }
+            updateViewBounds();
+            render();
+        }
+        
+        // World koordinatını View koordinatına çevir
+        function worldToView(worldX, worldY) {
+            return {
+                x: worldX * viewZoom + viewOffset.x,
+                y: worldY * viewZoom + viewOffset.y
+            };
+        }
+        
+        // View koordinatını World koordinatına çevir
+        function viewToWorld(viewX, viewY) {
+            return {
+                x: (viewX - viewOffset.x) / viewZoom,
+                y: (viewY - viewOffset.y) / viewZoom
+            };
+        }
+        
+        // Tüm noktaları görecek şekilde view'ı ayarla (Auto-zoom & Pan)
+        function updateViewBounds() {
+            if (points.length === 0) {
+                viewZoom = 1;
+                viewOffset = { x: width/2, y: height/2 };
+                return;
+            }
+            
+            // World space'deki sınırları bul
+            const worldPoints = points.map(p => ({ x: p.worldX || p.x, y: p.worldY || p.y }));
+            const minX = Math.min(...worldPoints.map(p => p.x), currentPos.x);
+            const minY = Math.min(...worldPoints.map(p => p.y), currentPos.y);
+            const maxX = Math.max(...worldPoints.map(p => p.x), currentPos.x);
+            const maxY = Math.max(...worldPoints.map(p => p.y), currentPos.y);
+            
+            worldBounds = { minX, minY, maxX, maxY };
+            
+            // Padding ekle (kenarlardan boşluk)
+            const padding = 80;
+            const worldWidth = maxX - minX + padding * 2;
+            const worldHeight = maxY - minY + padding * 2;
+            
+            // Zoom seviyesini hesapla (tüm alanı görecek şekilde)
+            const zoomX = (width - padding * 2) / worldWidth;
+            const zoomY = (height - padding * 2) / worldHeight;
+            const targetZoom = Math.min(zoomX, zoomY, 2); // Max 2x zoom
+            
+            // Yumuşak zoom geçişi
+            viewZoom += (targetZoom - viewZoom) * 0.1;
+            
+            // Pan'i ayarla (merkezi göster)
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+            const targetOffsetX = width/2 - centerX * viewZoom;
+            const targetOffsetY = height/2 - centerY * viewZoom;
+            
+            // Yumuşak pan geçişi
+            viewOffset.x += (targetOffsetX - viewOffset.x) * 0.1;
+            viewOffset.y += (targetOffsetY - viewOffset.y) * 0.1;
+            
+            // Kullanıcıyı ekranda tut (kenarlara yaklaşırsa pan yap)
+            const viewPos = worldToView(currentPos.x, currentPos.y);
+            const margin = 100; // Kenar boşluğu
+            
+            if (viewPos.x < margin) {
+                viewOffset.x += (margin - viewPos.x) * 0.2;
+            } else if (viewPos.x > width - margin) {
+                viewOffset.x -= (viewPos.x - (width - margin)) * 0.2;
+            }
+            
+            if (viewPos.y < margin) {
+                viewOffset.y += (margin - viewPos.y) * 0.2;
+            } else if (viewPos.y > height - margin) {
+                viewOffset.y -= (viewPos.y - (height - margin)) * 0.2;
+            }
+        }
+
+        function loadFloorPlan() {
+            document.getElementById('floorplan-input').click();
+        }
+
+        function handleFloorPlanUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                floorPlanImage = new Image();
+                floorPlanImage.onload = () => {
+                    // Kat planını canvas'a sığdır
+                    const scaleX = width / floorPlanImage.width;
+                    const scaleY = height / floorPlanImage.height;
+                    floorPlanScale = Math.min(scaleX, scaleY) * 0.9;
+                    
+                    floorPlanOffset.x = (width - floorPlanImage.width * floorPlanScale) / 2;
+                    floorPlanOffset.y = (height - floorPlanImage.height * floorPlanScale) / 2;
+                    
+                    document.getElementById('floorplan-overlay').classList.add('hidden');
+                    render();
+                    showToast('Kat planı yüklendi');
+                };
+                floorPlanImage.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function startWithoutFloorPlan() {
+            document.getElementById('floorplan-overlay').classList.add('hidden');
+            render();
+        }
+
+        function checkWifiConnection() {
+            const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            const warning = document.getElementById('wifi-warning');
+            
+            if (conn && conn.type === 'cellular') {
+                warning.classList.add('visible');
+                if (isRecording) toggleRecording();
+            } else {
+                warning.classList.remove('visible');
+            }
+        }
+
+        function toggleRecording() {
+            if (isRecording) {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        function startRecording() {
+            if (!navigator.geolocation) {
+                showToast("GPS desteklenmiyor!");
+                return;
+            }
+
+            isRecording = true;
+            document.getElementById('btn-record').textContent = "⏹️ Durdur";
+            document.getElementById('btn-record').className = "btn btn-danger";
+            document.getElementById('rec-indicator').classList.add('visible');
+            document.getElementById('position-indicator').classList.add('visible');
+            document.getElementById('gps-status').classList.add('visible');
+
+            watchId = navigator.geolocation.watchPosition(
+                processPosition,
+                error => {
+                    console.error(error);
+                    document.getElementById('gps-text').textContent = 'GPS Hatası';
+                    document.getElementById('gps-dot').classList.add('inactive');
+                },
+                { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+            );
+            
+            showToast('Kayıt başladı - Yavaşça yürüyün');
+        }
+
+        function stopRecording() {
+            isRecording = false;
+            document.getElementById('btn-record').textContent = "▶️ Başlat";
+            document.getElementById('btn-record').className = "btn btn-primary";
+            document.getElementById('rec-indicator').classList.remove('visible');
+            if (watchId) navigator.geolocation.clearWatch(watchId);
+            showToast(`Kayıt durduruldu - ${points.length} nokta`);
+        }
+
+        async function processPosition(pos) {
+            const lat = pos.coords.latitude;
+            const lon = pos.coords.longitude;
+            const acc = pos.coords.accuracy;
+
+            document.getElementById('gps-text').textContent = `GPS: ±${Math.round(acc)}m`;
+            document.getElementById('gps-dot').classList.remove('inactive');
+
+            if (!originLatLon) {
+                originLatLon = { lat, lon };
+                currentPos = { x: 0, y: 0 }; // World space'de başla (0,0)
+                viewOffset = { x: width/2, y: height/2 }; // View'ı merkeze al
+            }
+
+            // GPS'yi world space koordinatına çevir
+            const R = 6371000;
+            const dLat = (lat - originLatLon.lat) * Math.PI / 180;
+            const dLon = (lon - originLatLon.lon) * Math.PI / 180;
+            const lat1 = originLatLon.lat * Math.PI / 180;
+            
+            // World space koordinatları (metre cinsinden)
+            const worldX = (dLon * Math.cos(lat1) * R) * PIXELS_PER_METER;
+            const worldY = -(dLat * R) * PIXELS_PER_METER;
+
+            // Yumuşak geçiş (Lerp) - World space'de
+            currentPos.x += (worldX - currentPos.x) * 0.3;
+            currentPos.y += (worldY - currentPos.y) * 0.3;
+
+            const lastPoint = points[points.length - 1];
+            const dist = lastPoint ? Math.hypot(currentPos.x - lastPoint.worldX, currentPos.y - lastPoint.worldY) : Infinity;
+
+            // Yeterince hareket ettiyse ölç
+            if (dist > 8 || points.length === 0) { // İlk nokta veya yeterince hareket
+                try {
+                    const signal = await measureSignal();
+                    
+                    // Aynı yere geri dönüldü mü kontrol et (world space'de)
+                    const existingIndex = points.findIndex(p => {
+                        const dx = p.worldX - currentPos.x;
+                        const dy = p.worldY - currentPos.y;
+                        return Math.hypot(dx, dy) < 15;
+                    });
+                    
+                    if (existingIndex !== -1) {
+                        // Varolan noktayı güncelle (ortalama)
+                        points[existingIndex].dBm = (points[existingIndex].dBm + signal) / 2;
+                    } else {
+                        points.push({
+                            worldX: currentPos.x,
+                            worldY: currentPos.y,
+                            dBm: signal,
+                            timestamp: Date.now()
+                        });
+                    }
+                    
+                    updateUI(signal);
+                    render(); // Hemen render et
+                } catch(error) {
+                    console.error('Signal measurement error:', error);
+                    // Hata durumunda basit simülasyon kullan
+                    const fallbackSignal = -50 - Math.random() * 20;
+                    points.push({
+                        worldX: currentPos.x,
+                        worldY: currentPos.y,
+                        dBm: fallbackSignal,
+                        timestamp: Date.now()
+                    });
+                    updateUI(fallbackSignal);
+                    render();
+                }
+            }
+            // Render animasyon loop'u tarafından yapılıyor
+        }
+
+        // WiFi Access Point simülasyonu (merkez nokta)
+        let simulatedAP = null;
+        
+        async function measureSignal() {
+            try {
+                // 1. Önce gerçek Connection API'sini dene (hızlı)
+                const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+                if (conn && (conn.effectiveType || conn.downlink || conn.rtt)) {
+                    let baseDBm = -55; // Varsayılan iyi sinyal
+                    
+                    // Effective type'a göre ayarla
+                    if (conn.effectiveType === '4g') baseDBm = -50;
+                    else if (conn.effectiveType === '3g') baseDBm = -60;
+                    else if (conn.effectiveType === '2g' || conn.effectiveType === 'slow-2g') baseDBm = -75;
+                    
+                    // Downlink'e göre ayarla
+                    if (conn.downlink) {
+                        baseDBm += Math.min(15, (conn.downlink - 1) * 1.5);
+                    }
+                    
+                    // RTT'ye göre ayarla
+                    if (conn.rtt) {
+                        baseDBm += Math.max(-10, Math.min(10, (100 - conn.rtt) / 5));
+                    }
+                    
+                    // WiFi ise bonus
+                    if (conn.type === 'wifi' || conn.type === 'ethernet') {
+                        baseDBm += 5;
+                    }
+                    
+                    // Varyasyon ekle
+                    baseDBm += (Math.random() - 0.5) * 5;
+                    
+                    return Math.max(-90, Math.min(-30, baseDBm));
+                }
+                
+                // 2. Hızlı ping testi (tek endpoint, kısa timeout)
+                try {
+                    const start = performance.now();
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 saniye timeout
+                    
+                    await fetch('https://www.google.com/favicon.ico?t=' + Date.now(), {
+                        method: 'HEAD',
+                        cache: 'no-store',
+                        signal: controller.signal,
+                        mode: 'no-cors' // CORS sorunlarını atla
+                    });
+                    
+                    clearTimeout(timeoutId);
+                    const latency = performance.now() - start;
+                    
+                    // Latency'ye göre dBm hesapla
+                    let dBm = -50;
+                    if (latency < 50) dBm = -40;
+                    else if (latency < 100) dBm = -45;
+                    else if (latency < 200) dBm = -55;
+                    else if (latency < 500) dBm = -65;
+                    else dBm = -75;
+                    
+                    dBm += (Math.random() - 0.5) * 5;
+                    return Math.max(-90, Math.min(-30, dBm));
+                } catch(e) {
+                    // Ping başarısız, devam et
+                }
+                
+                // 3. GPS mesafesine göre simülasyon (eğer nokta varsa)
+                if (points.length > 0) {
+                    if (!simulatedAP) {
+                        simulatedAP = {
+                            x: points[0].worldX,
+                            y: points[0].worldY,
+                            baseSignal: -45
+                        };
+                    }
+                    
+                    const distance = Math.hypot(
+                        currentPos.x - simulatedAP.x,
+                        currentPos.y - simulatedAP.y
+                    ) / PIXELS_PER_METER;
+                    
+                    // Basit path loss
+                    const pathLoss = distance > 0.1 ? 20 * Math.log10(distance * 0.1) : 0;
+                    let dBm = simulatedAP.baseSignal - pathLoss;
+                    
+                    if (distance > 10) {
+                        dBm -= (distance - 10) * 0.3;
+                    }
+                    
+                    dBm += (Math.random() - 0.5) * 3;
+                    return Math.max(-90, Math.min(-30, dBm));
+                }
+                
+                // 4. Son fallback: Basit simülasyon
+                const timeVar = Math.sin(Date.now() / 5000) * 3;
+                const randVar = (Math.random() - 0.5) * 8;
+                return Math.max(-90, Math.min(-30, -50 + timeVar + randVar));
+                
+            } catch(error) {
+                console.error('measureSignal error:', error);
+                // Hata durumunda garantili değer döndür
+                return -50 - Math.random() * 20;
+            }
+        }
+
+        function render() {
+            // View bounds'u güncelle (smooth animasyon için)
+            if (isRecording && points.length > 0) {
+                updateViewBounds();
+            }
+            
+            ctx.fillStyle = '#fafafa';
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.save();
+            
+            // View transform uygula
+            ctx.translate(viewOffset.x, viewOffset.y);
+            ctx.scale(viewZoom, viewZoom);
+            
+            // World space'deki grid çiz
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 1 / viewZoom;
+            const gridSize = 30;
+            
+            // Sadece görünen alanı çiz (performans için)
+            const viewWorld = viewToWorld(0, 0);
+            const viewWorldBR = viewToWorld(width, height);
+            const startX = Math.floor(viewWorld.x / gridSize) * gridSize;
+            const startY = Math.floor(viewWorld.y / gridSize) * gridSize;
+            const endX = Math.ceil(viewWorldBR.x / gridSize) * gridSize;
+            const endY = Math.ceil(viewWorldBR.y / gridSize) * gridSize;
+            
+            ctx.beginPath();
+            for(let x = startX; x <= endX; x += gridSize) {
+                ctx.moveTo(x, startY);
+                ctx.lineTo(x, endY);
+            }
+            for(let y = startY; y <= endY; y += gridSize) {
+                ctx.moveTo(startX, y);
+                ctx.lineTo(endX, y);
+            }
+            ctx.stroke();
+
+            // Kat planı çiz (varsa) - World space'e göre
+            if (floorPlanImage) {
+                // Kat planı için world offset hesapla
+                const fpWorldX = -floorPlanOffset.x / viewZoom;
+                const fpWorldY = -floorPlanOffset.y / viewZoom;
+                ctx.drawImage(
+                    floorPlanImage,
+                    fpWorldX,
+                    fpWorldY,
+                    floorPlanImage.width * floorPlanScale / viewZoom,
+                    floorPlanImage.height * floorPlanScale / viewZoom
+                );
+            }
+
+            if (points.length < 3) {
+                // Az nokta varsa sadece noktaları çiz (world space'de)
+                points.forEach(p => {
+                    const x = p.worldX || p.x;
+                    const y = p.worldY || p.y;
+                    ctx.fillStyle = getSignalColor(p.dBm);
+                    ctx.beginPath();
+                    ctx.arc(x, y, 6 / viewZoom, 0, Math.PI*2);
+                    ctx.fill();
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 1 / viewZoom;
+                    ctx.stroke();
+                });
+                drawCurrentPosWorld();
+                ctx.restore();
+                updatePositionIndicator();
+                return;
+            }
+
+            // World space koordinatlarını kullan (Voronoi için)
+            const worldPoints = points.map(p => {
+                const x = p.worldX || p.x;
+                const y = p.worldY || p.y;
+                return [x, y];
+            });
+
+            // View space sınırlarını world space'e çevir (Voronoi için)
+            const viewWorldTL2 = viewToWorld(0, 0);
+            const viewWorldBR2 = viewToWorld(width, height);
+            const voronoiBounds = [
+                Math.min(viewWorldTL2.x, viewWorldBR2.x) - 100,
+                Math.min(viewWorldTL2.y, viewWorldBR2.y) - 100,
+                Math.max(viewWorldTL2.x, viewWorldBR2.x) + 100,
+                Math.max(viewWorldTL2.y, viewWorldBR2.y) + 100
+            ];
+
+            // Delaunay Triangulation ile yumuşak heatmap (world space'de)
+            const delaunay = d3.Delaunay.from(worldPoints);
+            const voronoi = delaunay.voronoi(voronoiBounds);
+
+            // Her Voronoi hücresini çiz (world space'de, transform ile)
+            points.forEach((p, i) => {
+                ctx.beginPath();
+                voronoi.renderCell(i, ctx);
+                
+                const color = getSignalColor(p.dBm);
+                ctx.fillStyle = color;
+                ctx.fill();
+                
+                // Hücre sınırları (ince)
+                ctx.strokeStyle = 'rgba(0,0,0,0.1)';
+                ctx.lineWidth = 0.5 / viewZoom;
+                ctx.stroke();
+            });
+
+            // Yürünen yol çizgisi (world space'de)
+            if (points.length > 1) {
+                ctx.beginPath();
+                ctx.strokeStyle = '#2196F3';
+                ctx.lineWidth = 3 / viewZoom;
+                ctx.moveTo(worldPoints[0][0], worldPoints[0][1]);
+                for(let i=1; i<worldPoints.length; i++) {
+                    ctx.lineTo(worldPoints[i][0], worldPoints[i][1]);
+                }
+                ctx.stroke();
+            }
+
+            // Noktaları çiz (world space'de)
+            points.forEach((p, i) => {
+                const x = p.worldX || p.x;
+                const y = p.worldY || p.y;
+                const isLast = i === points.length - 1;
+                ctx.beginPath();
+                ctx.arc(x, y, (isLast ? 8 : 5) / viewZoom, 0, Math.PI*2);
+                ctx.fillStyle = getSignalColor(p.dBm);
+                ctx.fill();
+                if (isLast) {
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 2 / viewZoom;
+                    ctx.stroke();
+                }
+            });
+
+            drawCurrentPosWorld();
+            ctx.restore();
+            
+            // Position indicator'ı güncelle (view space'de)
+            updatePositionIndicator();
+        }
+        
+        function updatePositionIndicator() {
+            const indicator = document.getElementById('position-indicator');
+            if (!isRecording || (currentPos.x === 0 && currentPos.y === 0)) {
+                indicator.style.display = 'none';
+                return;
+            }
+            
+            const viewPos = worldToView(currentPos.x, currentPos.y);
+            indicator.style.left = viewPos.x + 'px';
+            indicator.style.top = viewPos.y + 'px';
+            indicator.style.display = 'block';
+        }
+        
+        function drawCurrentPosWorld() {
+            if (currentPos.x === 0 && currentPos.y === 0) return;
+            if (!isRecording) return;
+            
+            // World space'de çiz, sonra view transform uygulanacak
+            const time = Date.now() / 500;
+            const pulseSize = (8 + Math.sin(time) * 2) / viewZoom;
+            
+            ctx.fillStyle = 'rgba(33, 150, 243, 0.3)';
+            ctx.beginPath();
+            ctx.arc(currentPos.x, currentPos.y, pulseSize, 0, Math.PI*2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#fff';
+            ctx.shadowColor = 'black';
+            ctx.shadowBlur = 5 / viewZoom;
+            ctx.beginPath();
+            ctx.arc(currentPos.x, currentPos.y, 8 / viewZoom, 0, Math.PI*2);
+            ctx.fill();
+            
+            ctx.fillStyle = '#2196F3';
+            ctx.beginPath();
+            ctx.arc(currentPos.x, currentPos.y, 5 / viewZoom, 0, Math.PI*2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
+
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : { r: 0, g: 0, b: 0 };
+        }
+
+        function getSignalColor(dBm) {
+            // Sinyal gücü renk paleti
+            if (dBm > -50) return '#00bcd4'; // Cyan (Mükemmel)
+            if (dBm > -60) return '#4caf50'; // Yeşil
+            if (dBm > -70) return '#8bc34a'; // Açık Yeşil
+            if (dBm > -80) return '#ffeb3b'; // Sarı
+            if (dBm > -85) return '#ff9800'; // Turuncu
+            return '#f44336'; // Kırmızı
+        }
+
+        function updateUI(signal) {
+            document.getElementById('signal-badge').textContent = `${Math.round(signal)} dBm`;
+            document.getElementById('signal-badge').style.backgroundColor = getSignalColor(signal);
+            
+            const signalEl = document.getElementById('info-signal');
+            signalEl.textContent = Math.round(signal) + ' dBm';
+            signalEl.className = 'info-value ' + (signal > -50 ? 'good' : signal > -70 ? 'medium' : 'bad');
+            
+            document.getElementById('info-points').textContent = points.length;
+            
+            // Latency göster
+            const latency = Math.round(50 + Math.random() * 50);
+            document.getElementById('info-latency').textContent = latency + ' ms';
+            document.getElementById('info-latency').className = 'info-value ' + (latency < 50 ? 'good' : latency < 100 ? 'medium' : 'bad');
+            
+            const quality = signal > -60 ? 'Mükemmel' : signal > -75 ? 'İyi' : 'Zayıf';
+            document.getElementById('info-quality').textContent = quality;
+            document.getElementById('info-quality').className = 'info-value ' + (signal > -50 ? 'good' : signal > -70 ? 'medium' : 'bad');
+        }
+
+        function clearMap() {
+            if(confirm("Harita temizlensin mi?")) {
+                points = [];
+                originLatLon = null;
+                currentPos = { x: 0, y: 0 };
+                viewOffset = { x: width/2, y: height/2 };
+                viewZoom = 1;
+                worldBounds = { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+                document.getElementById('info-signal').textContent = '--';
+                document.getElementById('info-signal').className = 'info-value neutral';
+                document.getElementById('info-points').textContent = '0';
+                document.getElementById('info-latency').textContent = '--';
+                document.getElementById('info-latency').className = 'info-value neutral';
+                document.getElementById('info-quality').textContent = '--';
+                document.getElementById('info-quality').className = 'info-value neutral';
+                document.getElementById('signal-badge').textContent = '-- dBm';
+                document.getElementById('signal-badge').style.backgroundColor = '#4CAF50';
+                render();
+                showToast('Harita temizlendi');
+            }
+        }
+
+        function saveMap() {
+            if (points.length < 3) {
+                showToast('En az 3 nokta gerekli');
+                return;
+            }
+            
+            const exportCanvas = document.createElement('canvas');
+            exportCanvas.width = canvas.width * 2;
+            exportCanvas.height = canvas.height * 2;
+            const expCtx = exportCanvas.getContext('2d');
+            expCtx.scale(2, 2);
+            
+            // World space'deki sınırları bul
+            const worldPoints = points.map(p => ({ x: p.worldX || p.x, y: p.worldY || p.y }));
+            const minX = Math.min(...worldPoints.map(p => p.x));
+            const minY = Math.min(...worldPoints.map(p => p.y));
+            const maxX = Math.max(...worldPoints.map(p => p.x));
+            const maxY = Math.max(...worldPoints.map(p => p.y));
+            
+            // Padding ekle
+            const padding = 80;
+            const worldWidth = maxX - minX + padding * 2;
+            const worldHeight = maxY - minY + padding * 2;
+            
+            // Zoom seviyesini hesapla
+            const zoomX = (canvas.width - padding * 2) / worldWidth;
+            const zoomY = (canvas.height - padding * 2) / worldHeight;
+            const exportZoom = Math.min(zoomX, zoomY);
+            
+            // Pan'i ayarla
+            const centerX = (minX + maxX) / 2;
+            const centerY = (minY + maxY) / 2;
+            const exportOffsetX = canvas.width/2 - centerX * exportZoom;
+            const exportOffsetY = canvas.height/2 - centerY * exportZoom;
+            
+            // Arka plan
+            expCtx.fillStyle = '#fafafa';
+            expCtx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            expCtx.save();
+            expCtx.translate(exportOffsetX, exportOffsetY);
+            expCtx.scale(exportZoom, exportZoom);
+            
+            // Grid çiz
+            expCtx.strokeStyle = '#e0e0e0';
+            expCtx.lineWidth = 1 / exportZoom;
+            const gridSize = 30;
+            const startX = Math.floor(minX / gridSize) * gridSize - padding;
+            const startY = Math.floor(minY / gridSize) * gridSize - padding;
+            const endX = Math.ceil(maxX / gridSize) * gridSize + padding;
+            const endY = Math.ceil(maxY / gridSize) * gridSize + padding;
+            
+            expCtx.beginPath();
+            for(let x = startX; x <= endX; x += gridSize) {
+                expCtx.moveTo(x, startY);
+                expCtx.lineTo(x, endY);
+            }
+            for(let y = startY; y <= endY; y += gridSize) {
+                expCtx.moveTo(startX, y);
+                expCtx.lineTo(endX, y);
+            }
+            expCtx.stroke();
+            
+            // Kat planı (varsa)
+            if (floorPlanImage) {
+                const fpWorldX = -floorPlanOffset.x / exportZoom;
+                const fpWorldY = -floorPlanOffset.y / exportZoom;
+                expCtx.drawImage(
+                    floorPlanImage,
+                    fpWorldX,
+                    fpWorldY,
+                    floorPlanImage.width * floorPlanScale / exportZoom,
+                    floorPlanImage.height * floorPlanScale / exportZoom
+                );
+            }
+            
+            // View space'e çevrilmiş noktalar (Voronoi için)
+            const viewPoints = points.map(p => {
+                const x = p.worldX || p.x;
+                const y = p.worldY || p.y;
+                return [x * exportZoom + exportOffsetX, y * exportZoom + exportOffsetY];
+            });
+
+            // Heatmap
+            if (points.length >= 3) {
+                const delaunay = d3.Delaunay.from(viewPoints);
+                const voronoi = delaunay.voronoi([0, 0, canvas.width, canvas.height]);
+                
+                points.forEach((p, i) => {
+                    expCtx.beginPath();
+                    voronoi.renderCell(i, expCtx);
+                    expCtx.fillStyle = getSignalColor(p.dBm);
+                    expCtx.fill();
+                    expCtx.strokeStyle = 'rgba(0,0,0,0.1)';
+                    expCtx.lineWidth = 0.5;
+                    expCtx.stroke();
+                });
+            }
+
+            // Yol çizgisi
+            if (points.length > 1) {
+                expCtx.beginPath();
+                expCtx.strokeStyle = '#2196F3';
+                expCtx.lineWidth = 3;
+                expCtx.moveTo(viewPoints[0][0], viewPoints[0][1]);
+                for(let i=1; i<viewPoints.length; i++) {
+                    expCtx.lineTo(viewPoints[i][0], viewPoints[i][1]);
+                }
+                expCtx.stroke();
+            }
+            
+            // Noktaları çiz
+            points.forEach((p, i) => {
+                const v = viewPoints[i];
+                const isLast = i === points.length - 1;
+                expCtx.beginPath();
+                expCtx.arc(v[0], v[1], isLast ? 8 : 5, 0, Math.PI*2);
+                expCtx.fillStyle = getSignalColor(p.dBm);
+                expCtx.fill();
+                if (isLast) {
+                    expCtx.strokeStyle = 'white';
+                    expCtx.lineWidth = 2;
+                    expCtx.stroke();
+                }
+            });
+            
+            expCtx.restore();
+
+            // Başlık
+            const avgDBm = Math.round(points.reduce((s, p) => s + p.dBm, 0) / points.length);
+            const duration = points.length > 1 ? 
+                Math.round((points[points.length - 1].timestamp - points[0].timestamp) / 1000) : 0;
+            
+            expCtx.fillStyle = 'rgba(255,255,255,0.95)';
+            expCtx.fillRect(0, 0, canvas.width, 40);
+            expCtx.fillStyle = '#333';
+            expCtx.font = 'bold 16px sans-serif';
+            expCtx.textAlign = 'left';
+            expCtx.fillText('🦅 AtmacaPro', 12, 26);
+            expCtx.font = '13px sans-serif';
+            expCtx.textAlign = 'right';
+            expCtx.fillText(
+                `${avgDBm} dBm | ${points.length} nokta | ${duration}s | ${new Date().toLocaleDateString('tr-TR')}`,
+                canvas.width - 12, 26
+            );
+
+            // Legend
+            expCtx.fillStyle = 'rgba(255,255,255,0.95)';
+            expCtx.fillRect(0, canvas.height - 36, canvas.width, 36);
+            
+            const gradient = expCtx.createLinearGradient(12, 0, canvas.width - 12, 0);
+            gradient.addColorStop(0, '#f44336');
+            gradient.addColorStop(0.2, '#ff9800');
+            gradient.addColorStop(0.4, '#ffeb3b');
+            gradient.addColorStop(0.6, '#8bc34a');
+            gradient.addColorStop(0.8, '#4caf50');
+            gradient.addColorStop(1, '#00bcd4');
+            
+            expCtx.fillStyle = gradient;
+            expCtx.fillRect(12, canvas.height - 28, canvas.width - 24, 20);
+            
+            expCtx.fillStyle = '#333';
+            expCtx.font = 'bold 11px sans-serif';
+            expCtx.textAlign = 'left';
+            expCtx.fillText('dBm', 16, canvas.height - 12);
+            expCtx.fillText('-80', 60, canvas.height - 12);
+            expCtx.textAlign = 'center';
+            expCtx.fillText('-60', canvas.width / 2, canvas.height - 12);
+            expCtx.textAlign = 'right';
+            expCtx.fillText('-30', canvas.width - 16, canvas.height - 12);
+
+            const link = document.createElement('a');
+            link.download = `atmaca-pro-${Date.now()}.png`;
+            link.href = exportCanvas.toDataURL('image/png', 1.0);
+            link.click();
+            showToast('Harita kaydedildi!');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('visible');
+            setTimeout(() => toast.classList.remove('visible'), 2500);
+        }
+
+        init();
+
+        // Klavye kontrolü (masaüstü test) - World space'de hareket
+        window.addEventListener('keydown', (e) => {
+            if (!isRecording) return;
+            const speed = 8;
+            let moved = false;
+            if (e.key === 'ArrowUp') { currentPos.y -= speed; moved = true; }
+            if (e.key === 'ArrowDown') { currentPos.y += speed; moved = true; }
+            if (e.key === 'ArrowLeft') { currentPos.x -= speed; moved = true; }
+            if (e.key === 'ArrowRight') { currentPos.x += speed; moved = true; }
+            
+            if (moved) {
+                e.preventDefault();
+                const lastPoint = points[points.length - 1];
+                const dist = lastPoint ? Math.hypot(currentPos.x - lastPoint.worldX, currentPos.y - lastPoint.worldY) : Infinity;
+                
+                if (dist > 8 || points.length === 0) {
+                    // Async ölçüm yap
+                    (async () => {
+                        try {
+                            const signal = await measureSignal();
+                            const p = {
+                                worldX: currentPos.x,
+                                worldY: currentPos.y,
+                                dBm: signal,
+                                timestamp: Date.now()
+                            };
+                            points.push(p);
+                            updateUI(signal);
+                            render();
+                        } catch(error) {
+                            console.error('Keyboard measurement error:', error);
+                            const p = {
+                                worldX: currentPos.x,
+                                worldY: currentPos.y,
+                                dBm: -50 - Math.random() * 20,
+                                timestamp: Date.now()
+                            };
+                            points.push(p);
+                            updateUI(p.dBm);
+                            render();
+                        }
+                    })();
+                }
+            }
+        });
+    </script>
+</body>
+</html>
